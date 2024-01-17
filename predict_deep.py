@@ -1,8 +1,7 @@
 from src.data_loader import DataLoader
-from src.ml_model import MachineLearningModel
 
 # images_size = (64, 64)
-from src.utils.deep_model import CNNModel
+from src.deep_model import CNNModel
 
 images_size = (100, 100)
 dl = DataLoader(images_size=images_size)
