@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
@@ -31,10 +32,14 @@ class CNNModel:
         self.model.fit(train_data, train_labels, batch_size=batch_size, epochs=epochs,
                        validation_data=validation_data)
 
-    def predict(self, data):
+    def predict(self, image):
         if not self.model:
             raise Exception("Model not built. Call 'build_model' before 'predict'.")
-        return self.model.predict(data)
+        if len(image.shape) == 3:
+            image = np.expand_dims(image, axis=0)
+        pred = self.model.predict(image)
+        pred = np.argmax(pred)
+        return pred
 
     def optimize(self, learning_rate):
         if not self.model:
@@ -42,4 +47,9 @@ class CNNModel:
         optimizer = Adam(learning_rate=learning_rate)
         self.model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
+    def save_weights(self, file_path):
+        self.model.save_weights(file_path)
+
+    def load_weights(self, file_path):
+        self.model.load_weights(file_path)
 

@@ -50,7 +50,7 @@ class DataLoader(object):
         print(labels_list[:25])
         labels_list_array = self.one_hot_encode(labels_list)
         images_list_array = np.array(images_list)
-        images_list_array = images_list_array/255.0
+        images_list_array = images_list_array / 255.0
         if shuffle:
             indices = np.arange(len(images_list_array))
             np.random.shuffle(indices)
@@ -65,5 +65,8 @@ class DataLoader(object):
         #     return x_data, y_data, labels, cropped
         # return images_list_array, labels_list_array
 
-
-
+    def read_and_preprocess_single_image(self, image_path):
+        img = cv2.imread(image_path)
+        resized_img = cv2.resize(img, self.images_size)
+        resized_img = resized_img / 255.0
+        return resized_img
