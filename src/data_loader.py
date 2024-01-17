@@ -32,7 +32,7 @@ class DataLoader(object):
         images_list, labels_list = [], []
         if dataset_type == 'train':
             images_main_path = self.data_path + 'traffic_Data/DATA/'
-        elif dataset_type == 'train':
+        elif dataset_type == 'test':
             images_main_path = self.data_path + 'traffic_Data/TEST/'
         labels_name, class_ids = self.labels_csv_reader()
         print("len(class_ids)", len(class_ids))
@@ -40,14 +40,17 @@ class DataLoader(object):
             class_images_path = images_main_path + f'{cl}/'
             images_names = os.listdir(class_images_path)
             for im in images_names:
+                # print(class_images_path + im, cl)
                 img = cv2.imread(class_images_path + im)
-                print("img.shape: ", img.shape)
+                # print("img.shape: ", img.shape, cl, im)
                 resized_img = cv2.resize(img, self.images_size)
                 images_list.append(resized_img)
-                labels_list.append(cl)
+                # print("type(cl): ", type(cl))
+                labels_list.append(int(cl))
+        print(labels_list[:25])
         labels_list_array = self.one_hot_encode(labels_list)
         images_list_array = np.array(images_list)
-
+        images_list_array = images_list_array/255.0
         if shuffle:
             indices = np.arange(len(images_list_array))
             np.random.shuffle(indices)
