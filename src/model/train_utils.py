@@ -2,6 +2,8 @@ import os
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+
 
 from src.utils.helpers import save_json
 
@@ -68,15 +70,16 @@ def train(cfg, model, train_loader, val_loader, device):
     print(f"Using device: {device}\n")
     os.makedirs(cfg["save_dir"], exist_ok=True)
 
+    # if no save_path given, fall back to save_dir in cfg
+
     optimizer = torch.optim.Adam(model.parameters(),lr=cfg["lr"], weight_decay=cfg["weight_decay"])
     print("optimizer: ", optimizer)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=cfg["lr_patience"], factor=cfg["lr_factor"])
     print("scheduler: ", scheduler)
 
-    # ── training loop ─────────────────────────────────────────────────────────
     best_val_loss    = float("inf")
-    no_improve_count = 0                # early-stopping counter
-
+    no_improve_count = 0
+    history = {'train':[],'valid':[]}
     for epoch in range(1, cfg["epochs"] + 1):
         print("epoch: ", epoch)
         train_m = run_epoch(model, train_loader, cfg, device, optimizer)
@@ -84,6 +87,9 @@ def train(cfg, model, train_loader, val_loader, device):
 
         scheduler.step(val_m["loss"])
         current_lr = optimizer.param_groups[0]["lr"]
+
+        history['train'].append(train_m)
+        history['valid'].append(val_m)
 
         print(
             f"Epoch {epoch:03d}/{cfg['epochs']}  "
@@ -96,18 +102,16 @@ def train(cfg, model, train_loader, val_loader, device):
             f"| lr={current_lr:.2e}"
         )
 
-        # save checkpoint whenever val loss improves
         if val_m["loss"] < best_val_loss:
             best_val_loss    = val_m["loss"]
             no_improve_count = 0
-            ckpt_path = os.path.join(cfg["save_dir"], "best_model.pt")
-            torch.save({
-                "epoch"      : epoch,
-                "model_state": model.state_dict(),
-                "val_loss"   : best_val_loss,
-                "cfg"        : cfg,           # save cfg alongside weights – good practice
-            }, ckpt_path)
-            print(f"  -> saved best model  (val_loss={best_val_loss:.4f})")
+
+            # save weights
+            ckpt_path = f"{cfg['save_path']}/weights/{cfg['experiment']}.pt"
+            torch.save({"epoch": epoch, "model_state": model.state_dict(), "val_loss": best_val_loss}, ckpt_path)
+
+
+            print(f"  -> saved best model + cfg to {ckpt_path}  (val_loss={best_val_loss:.4f})")
 
         else:
             no_improve_count += 1
@@ -115,13 +119,44 @@ def train(cfg, model, train_loader, val_loader, device):
                 print(f"\nEarly stopping – no improvement for {cfg['early_stop_patience']} epochs.")
                 break
 
-    print(f"\nTraining done. Best val loss: {best_val_loss:.4f}")
-    print(f"Checkpoint: {os.path.join(cfg['save_dir'], 'best_model.pt')}")
-    return model
+    cfg_path = f"{cfg['save_path']}/configs/{cfg['experiment']}.json"
+    save_json(cfg, cfg_path)
 
+    history_path = f"{cfg['save_path']}/history/{cfg['experiment']}.json" 
+    save_json(history, history_path)
+
+
+    print(f"\nTraining done. Best val loss: {best_val_loss:.4f}")
+    return model,  history
 
 def count_total_parameters(model):
     total = sum(p.numel() for p in model.parameters())
     print("="*50)
     print(f"📊 Total Parameters in Model: {total:,}".center(50))
     print("="*50)
+
+
+def plot_training_curves(train_history, val_history):
+    """
+    train_history / val_history: lists of the dicts returned by run_epoch
+    e.g. train_history = [{"loss": 1.2, "legib_acc": 0.6, ...}, ...]
+    """
+    epochs = range(1, len(train_history) + 1)
+    metrics = ["loss", "legib_loss", "num_loss", "legib_acc", "num_acc"]
+
+    fig, axes = plt.subplots(1, len(metrics), figsize=(20, 4))
+
+    for ax, key in zip(axes, metrics):
+        train_vals = [m[key] for m in train_history]
+        val_vals   = [m[key] for m in val_history]
+
+        ax.plot(epochs, train_vals, label="train")
+        ax.plot(epochs, val_vals,   label="val", linestyle="--")
+        ax.set_title(key)
+        ax.set_xlabel("epoch")
+        ax.legend()
+        ax.grid(True)
+
+    plt.tight_layout()
+    plt.savefig("training_curves.png", dpi=150)
+    plt.show()
